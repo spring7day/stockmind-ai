@@ -1,0 +1,47 @@
+{
+  "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": true,
+  "model": "claude-sonnet-4-6",
+  "agentTeam": {
+    "lead": {
+      "instructions": "CLAUDE.md",
+      "model": "claude-opus-4"
+    },
+    "teammates": [
+      {
+        "name": "PM",
+        "workdir": "agents/pm",
+        "instructions": "agents/pm/CLAUDE.md"
+      },
+      {
+        "name": "UX",
+        "workdir": "agents/ux",
+        "instructions": "agents/ux/CLAUDE.md"
+      },
+      {
+        "name": "Frontend",
+        "workdir": "src/frontend",
+        "instructions": "src/frontend/CLAUDE.md"
+      },
+      {
+        "name": "Backend",
+        "workdir": "src/backend",
+        "instructions": "src/backend/CLAUDE.md"
+      },
+      {
+        "name": "AI_ML",
+        "workdir": "src/ai",
+        "instructions": "src/ai/CLAUDE.md"
+      },
+      {
+        "name": "Infra",
+        "workdir": "agents/infra",
+        "instructions": "agents/infra/CLAUDE.md"
+      },
+      {
+        "name": "QA",
+        "workdir": "agents/qa",
+        "instructions": "agents/qa/CLAUDE.md"
+      }
+    ]
+  }
+}
