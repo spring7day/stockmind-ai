@@ -1,8 +1,5 @@
-import type { NextConfig } from 'next'
-
-const nextConfig: NextConfig = {
-  // Docker 컨테이너에서 standalone 빌드 사용
-  output: 'standalone',
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   // 백엔드 API 프록시 설정
   async rewrites() {
     return [
