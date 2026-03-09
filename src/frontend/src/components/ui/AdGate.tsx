@@ -183,7 +183,7 @@ export default function AdGate({ ticker, children, label }: AdGateProps) {
         </div>
 
         {/* 잠금 오버레이 */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-xs">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
           <div className="text-center px-6 py-8 max-w-xs">
             {/* 자물쇠 아이콘 */}
             <div className="w-14 h-14 rounded-full bg-card border border-border flex items-center justify-center mx-auto mb-4">

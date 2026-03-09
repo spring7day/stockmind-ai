@@ -92,8 +92,12 @@ export interface WatchlistItem {
   ticker: string
   name: string
   market: Stock['market']
-  addedAt: string  // 추가 날짜
-  note?: string    // 사용자 메모
+  addedAt: string           // camelCase (로컬 저장용)
+  note?: string             // 사용자 메모 (로컬 전용)
+  // 백엔드 연동 시 추가 필드
+  currentPrice?: number     // 현재가 (backend: current_price)
+  changePct?: number        // 등락률 (backend: change_pct)
+  alertPrice?: number       // 알림 가격 (backend: alert_price)
 }
 
 /** API 응답 공통 래퍼 */

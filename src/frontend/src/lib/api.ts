@@ -10,7 +10,6 @@ import type {
   NewsItem,
   Fundamentals,
   SearchResult,
-  ApiResponse,
   WatchlistItem,
 } from '@/types/stock'
 
@@ -29,7 +28,13 @@ export class ApiError extends Error {
   }
 }
 
-/** 기본 fetch 래퍼 */
+/** 백엔드 ApiResponse 래퍼 타입 { success, data } */
+interface ApiResponse<T> {
+  success: boolean
+  data: T
+}
+
+/** 기본 fetch 래퍼 — 백엔드는 Pydantic 모델을 직접 반환 (래퍼 없음) */
 async function fetchApi<T>(
   path: string,
   options?: RequestInit
@@ -48,13 +53,136 @@ async function fetchApi<T>(
     throw new ApiError(response.status, `API 오류: ${response.statusText}`)
   }
 
-  const json: ApiResponse<T> = await response.json()
+  return response.json() as Promise<T>
+}
 
-  if (!json.success) {
-    throw new ApiError(500, json.error || '알 수 없는 오류가 발생했습니다')
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 백엔드 응답 타입 (snake_case → 내부 매핑용)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+interface BackendStockPrice {
+  current: number
+  open: number
+  high: number
+  low: number
+  prev_close: number
+  change: number
+  change_pct: number
+  volume: number
+  trading_value?: number
+}
+
+interface BackendStockInfo {
+  ticker: string
+  name: string
+  market: string
+  sector?: string
+  price?: BackendStockPrice
+  fundamentals?: {
+    market_cap?: number
+    per?: number
+    pbr?: number
+    eps?: number
+    roe?: number
+    debt_ratio?: number
+    dividend_yield?: number
   }
+}
 
-  return json.data
+interface BackendAnalysisResult {
+  ticker: string
+  name: string
+  technical: {
+    trend: string
+    support_levels: number[]
+    resistance_levels: number[]
+    moving_averages: Record<string, number>
+    rsi?: number
+    volume_trend: string
+    summary: string
+    signals: string[]
+  }
+  fundamental: {
+    valuation: string
+    growth_potential: string
+    financial_health: string
+    peer_comparison: string
+    summary: string
+    risks: string[]
+    opportunities: string[]
+  }
+  hidden_insights: {
+    smart_money_flow: string
+    unusual_activity: string[]
+    dark_pool_signals: string
+    seasonal_patterns?: string
+    catalyst_events: string[]
+    summary: string
+  }
+  sentiment: {
+    overall_sentiment: string
+    news_sentiment: string
+    disclosure_sentiment: string
+    retail_interest: string
+    social_buzz?: string
+    summary: string
+  }
+  overall_summary: string
+  disclaimer: string
+  analyzed_at: string
+  cached: boolean
+}
+
+interface BackendNewsResponse {
+  ticker: string
+  name: string
+  items: BackendNewsItem[]
+  fetched_at: string
+}
+
+interface BackendNewsItem {
+  id?: string
+  title: string
+  source: string
+  url?: string
+  published_at?: string
+  publishedAt?: string
+  summary?: string
+  sentiment?: string
+  sentimentScore?: number
+  is_disclosure: boolean
+  isDisclosure?: boolean
+}
+
+interface BackendSearchResponse {
+  query: string
+  results: Array<{
+    ticker: string
+    name: string
+    market: string
+    current_price?: number
+    change_pct?: number
+  }>
+  total: number
+}
+
+/** /popular 응답 내 각 항목 — 백엔드 StockSummaryResponse (camelCase) */
+interface BackendStockSummaryItem {
+  ticker: string
+  name: string
+  market: string
+  sector?: string
+  currency?: string
+  currentPrice?: number
+  openPrice?: number
+  highPrice?: number
+  lowPrice?: number
+  closePrice?: number
+  change?: number
+  changePercent?: number
+  volume?: number
+  marketCap?: number
+  updatedAt?: string
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -167,6 +295,133 @@ const MOCK_POPULAR_STOCKS: StockSummary[] = [
 ]
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 응답 변환 헬퍼
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function mapBackendPriceToFrontend(ticker: string, name: string, price: BackendStockPrice): StockPrice {
+  return {
+    ticker,
+    currentPrice: price.current,
+    openPrice: price.open,
+    highPrice: price.high,
+    lowPrice: price.low,
+    closePrice: price.prev_close,
+    change: price.change,
+    changePercent: price.change_pct,
+    volume: price.volume,
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+function mapBackendNewsItem(item: BackendNewsItem, index: number): NewsItem {
+  const sentimentMap: Record<string, NewsItem['sentiment']> = {
+    '긍정': 'POSITIVE',
+    '부정': 'NEGATIVE',
+    '중립': 'NEUTRAL',
+    'positive': 'POSITIVE',
+    'negative': 'NEGATIVE',
+    'neutral': 'NEUTRAL',
+  }
+  return {
+    // 백엔드가 UUID id를 반환하면 사용, 없으면 index 기반 fallback
+    id: item.id || String(index + 1),
+    title: item.title,
+    source: item.source,
+    url: item.url || '#',
+    // publishedAt 우선, 없으면 published_at, 그 다음 현재 시각
+    publishedAt: item.publishedAt || item.published_at || new Date().toISOString(),
+    sentiment: (item.sentiment && sentimentMap[item.sentiment.toLowerCase()]) || 'NEUTRAL',
+    // 백엔드 sentimentScore가 있으면 사용, 없으면 0
+    sentimentScore: item.sentimentScore ?? 0,
+    summary: item.summary,
+  }
+}
+
+function mapBackendAnalysisToTab(result: BackendAnalysisResult, tab: AnalysisTab): AnalysisResult {
+  const tabSections: Record<AnalysisTab, { summary: string; details: string }> = {
+    technical: {
+      summary: result.technical.summary,
+      details: [
+        `## 기술적 분석\n`,
+        `**추세:** ${result.technical.trend}`,
+        `**거래량 추세:** ${result.technical.volume_trend}`,
+        result.technical.rsi != null ? `**RSI:** ${result.technical.rsi.toFixed(1)}` : '',
+        result.technical.support_levels.length > 0
+          ? `**지지선:** ${result.technical.support_levels.map(p => p.toLocaleString()).join(', ')}원`
+          : '',
+        result.technical.resistance_levels.length > 0
+          ? `**저항선:** ${result.technical.resistance_levels.map(p => p.toLocaleString()).join(', ')}원`
+          : '',
+        `\n### AI 요약\n${result.technical.summary}`,
+        result.technical.signals.length > 0
+          ? `\n### 주요 신호\n${result.technical.signals.map(s => `- ${s}`).join('\n')}`
+          : '',
+        `\n> ⚠️ ${result.disclaimer}`,
+      ].filter(Boolean).join('\n'),
+    },
+    fundamental: {
+      summary: result.fundamental.summary,
+      details: [
+        `## 펀더멘털 분석\n`,
+        `**밸류에이션:** ${result.fundamental.valuation}`,
+        `**성장 가능성:** ${result.fundamental.growth_potential}`,
+        `**재무 건전성:** ${result.fundamental.financial_health}`,
+        `**동종업계 비교:** ${result.fundamental.peer_comparison}`,
+        `\n### AI 요약\n${result.fundamental.summary}`,
+        result.fundamental.risks.length > 0
+          ? `\n### 리스크 요소\n${result.fundamental.risks.map(r => `- ${r}`).join('\n')}`
+          : '',
+        result.fundamental.opportunities.length > 0
+          ? `\n### 기회 요소\n${result.fundamental.opportunities.map(o => `- ${o}`).join('\n')}`
+          : '',
+        `\n> ⚠️ ${result.disclaimer}`,
+      ].filter(Boolean).join('\n'),
+    },
+    insights: {
+      summary: result.hidden_insights.summary,
+      details: [
+        `## 숨겨진 인사이트\n`,
+        `**스마트 머니 흐름:** ${result.hidden_insights.smart_money_flow}`,
+        `**기관/외국인 시그널:** ${result.hidden_insights.dark_pool_signals}`,
+        result.hidden_insights.seasonal_patterns
+          ? `**계절적 패턴:** ${result.hidden_insights.seasonal_patterns}`
+          : '',
+        result.hidden_insights.unusual_activity.length > 0
+          ? `\n### 이상 징후\n${result.hidden_insights.unusual_activity.map(a => `- ${a}`).join('\n')}`
+          : '',
+        result.hidden_insights.catalyst_events.length > 0
+          ? `\n### 예상 촉매 이벤트\n${result.hidden_insights.catalyst_events.map(e => `- ${e}`).join('\n')}`
+          : '',
+        `\n### AI 요약\n${result.hidden_insights.summary}`,
+        `\n> ⚠️ ${result.disclaimer}`,
+      ].filter(Boolean).join('\n'),
+    },
+    sentiment: {
+      summary: result.sentiment.summary,
+      details: [
+        `## 뉴스 센티먼트 분석\n`,
+        `**전반적 심리:** ${result.sentiment.overall_sentiment}`,
+        `**뉴스 센티먼트:** ${result.sentiment.news_sentiment}`,
+        `**공시 센티먼트:** ${result.sentiment.disclosure_sentiment}`,
+        `**개인투자자 관심도:** ${result.sentiment.retail_interest}`,
+        result.sentiment.social_buzz ? `**소셜 화제도:** ${result.sentiment.social_buzz}` : '',
+        `\n### AI 요약\n${result.sentiment.summary}`,
+        `\n> ⚠️ ${result.disclaimer}`,
+      ].filter(Boolean).join('\n'),
+    },
+  }
+
+  return {
+    tab,
+    ticker: result.ticker,
+    summary: tabSections[tab].summary,
+    details: tabSections[tab].details,
+    generatedAt: result.analyzed_at,
+    disclaimer: result.disclaimer,
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // API 함수들
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -174,7 +429,42 @@ const MOCK_POPULAR_STOCKS: StockSummary[] = [
 export async function getPopularStocks(): Promise<StockSummary[]> {
   if (MOCK_MODE) return MOCK_POPULAR_STOCKS
 
-  return fetchApi<StockSummary[]>('/api/stocks/popular')
+  try {
+    // 백엔드 /popular는 ApiResponse<StockSummaryResponse[]> 래퍼로 반환
+    // StockSummaryResponse 필드는 camelCase (currentPrice, changePercent 등)
+    const response = await fetchApi<ApiResponse<BackendStockSummaryItem[]>>('/api/stocks/popular')
+    const items = response.data
+    return items.map((item) => ({
+      ticker: item.ticker,
+      name: item.name,
+      market: item.market as StockSummary['market'],
+      sector: item.sector,
+      currency: (item.currency || 'KRW') as 'KRW' | 'USD',
+      currentPrice: item.currentPrice ?? 0,
+      openPrice: item.openPrice ?? 0,
+      highPrice: item.highPrice ?? 0,
+      lowPrice: item.lowPrice ?? 0,
+      closePrice: item.closePrice ?? 0,
+      change: item.change ?? 0,
+      changePercent: item.changePercent ?? 0,
+      volume: item.volume ?? 0,
+      marketCap: item.marketCap,
+      updatedAt: item.updatedAt || new Date().toISOString(),
+    }))
+  } catch {
+    return MOCK_POPULAR_STOCKS
+  }
+}
+
+/** 종목 기본 정보 (이름, 시장) 조회 */
+export async function getStockInfo(ticker: string): Promise<{ name: string; market: string; ticker: string }> {
+  if (MOCK_MODE) {
+    const found = MOCK_POPULAR_STOCKS.find((s) => s.ticker === ticker)
+    if (found) return { name: found.name, market: found.market, ticker }
+    return { name: ticker, market: 'KOSPI', ticker }
+  }
+  const info = await fetchApi<BackendStockInfo>(`/api/stocks/${ticker}`)
+  return { name: info.name, market: info.market, ticker: info.ticker }
 }
 
 /** 종목 실시간 가격 조회 */
@@ -182,7 +472,6 @@ export async function getStockPrice(ticker: string): Promise<StockPrice> {
   if (MOCK_MODE) {
     const found = MOCK_POPULAR_STOCKS.find((s) => s.ticker === ticker)
     if (found) return found
-    // 목 데이터에 없는 경우 기본값 반환
     return {
       ticker,
       currentPrice: 50000,
@@ -197,7 +486,10 @@ export async function getStockPrice(ticker: string): Promise<StockPrice> {
     }
   }
 
-  return fetchApi<StockPrice>(`/api/stocks/${ticker}/price`)
+  // /price 전용 엔드포인트 사용 — ApiResponse<StockPriceResponse> 래퍼로 반환
+  // StockPriceResponse는 이미 camelCase 필드로 프론트엔드와 1:1 매핑
+  const response = await fetchApi<ApiResponse<StockPrice>>(`/api/stocks/${ticker}/price`)
+  return response.data
 }
 
 /** 종목 차트 데이터 조회 */
@@ -206,11 +498,15 @@ export async function getStockChart(
   period: '1D' | '1W' | '1M' | '3M' | '1Y' = '3M'
 ): Promise<CandleData[]> {
   if (MOCK_MODE) {
-    // 목 차트 데이터 생성
     return generateMockCandleData(ticker, period)
   }
 
-  return fetchApi<CandleData[]>(`/api/stocks/${ticker}/chart?period=${period}`)
+  try {
+    return await fetchApi<CandleData[]>(`/api/stocks/${ticker}/chart?period=${period}`)
+  } catch {
+    // 차트 엔드포인트 없으면 목 데이터 폴백
+    return generateMockCandleData(ticker, period)
+  }
 }
 
 /** AI 분석 결과 조회 */
@@ -222,7 +518,8 @@ export async function getAnalysis(
     return generateMockAnalysis(ticker, tab)
   }
 
-  return fetchApi<AnalysisResult>(`/api/stocks/${ticker}/analysis/${tab}`)
+  const result = await fetchApi<BackendAnalysisResult>(`/api/stocks/${ticker}/analysis`)
+  return mapBackendAnalysisToTab(result, tab)
 }
 
 /** 뉴스/공시 조회 */
@@ -234,7 +531,9 @@ export async function getNews(
     return generateMockNews(ticker)
   }
 
-  return fetchApi<NewsItem[]>(`/api/stocks/${ticker}/news?page=${page}`)
+  // 백엔드 /news는 ApiResponse<NewsResponse> 래퍼로 반환
+  const response = await fetchApi<ApiResponse<BackendNewsResponse>>(`/api/stocks/${ticker}/news?page=${page}`)
+  return response.data.items.map((item, i) => mapBackendNewsItem(item, i))
 }
 
 /** 종목 검색 */
@@ -256,7 +555,13 @@ export async function searchStocks(query: string): Promise<SearchResult[]> {
       }))
   }
 
-  return fetchApi<SearchResult[]>(`/api/stocks/search?q=${encodeURIComponent(query)}`)
+  const data = await fetchApi<BackendSearchResponse>(`/api/stocks/search?q=${encodeURIComponent(query)}`)
+  return data.results.map((r) => ({
+    ticker: r.ticker,
+    name: r.name,
+    market: r.market as SearchResult['market'],
+    matchScore: 1.0,
+  }))
 }
 
 /** 관심 종목 조회 */

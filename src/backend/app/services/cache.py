@@ -20,6 +20,7 @@ class CacheService:
         self._redis = None
         self._memory: dict[str, tuple[Any, float]] = {}  # {key: (value, expires_at)}
         self._use_redis = False
+        self._set_count = 0  # in-memory 정리 트리거용
 
     async def connect(self):
         """Redis에 연결을 시도합니다. 실패하면 in-memory 모드로 전환합니다."""
@@ -107,6 +108,11 @@ class CacheService:
             # in-memory 캐시
             expires_at = (time.time() + ttl) if ttl > 0 else 0
             self._memory[key] = (value, expires_at)
+            # 주기적으로 만료 항목 정리 (100회마다)
+            self._set_count += 1
+            if self._set_count >= 100:
+                self._clean_expired()
+                self._set_count = 0
 
     async def delete(self, key: str):
         """캐시에서 키를 삭제합니다."""

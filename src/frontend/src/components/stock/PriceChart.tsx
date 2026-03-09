@@ -31,6 +31,7 @@ export default function PriceChart({ ticker, currentPrice, changePercent }: Pric
   const chartRef = useRef<any>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const seriesRef = useRef<any>(null)
+  const resizeObserverRef = useRef<ResizeObserver | null>(null)
 
   const [period, setPeriod] = useState<Period>('3M')
   const [candles, setCandles] = useState<CandleData[]>([])
@@ -124,19 +125,22 @@ export default function PriceChart({ ticker, currentPrice, changePercent }: Pric
       seriesRef.current = candleSeries
 
       // 반응형 리사이즈
-      const resizeObserver = new ResizeObserver((entries) => {
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect()
+      }
+      resizeObserverRef.current = new ResizeObserver((entries) => {
         if (entries[0]) {
           chart.applyOptions({ width: entries[0].contentRect.width })
         }
       })
-      resizeObserver.observe(container)
-
-      return () => {
-        resizeObserver.disconnect()
-      }
+      resizeObserverRef.current.observe(container)
     })
 
     return () => {
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect()
+        resizeObserverRef.current = null
+      }
       if (chartRef.current) {
         chartRef.current.remove()
         chartRef.current = null

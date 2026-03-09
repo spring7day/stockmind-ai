@@ -32,11 +32,41 @@ function SentimentBadge({ sentiment, score }: { sentiment: NewsItem['sentiment']
   )
 }
 
+/** 다양한 형식의 날짜 문자열 파싱 */
+function parseDate(dateStr: string): Date | null {
+  if (!dateStr) return null
+
+  // ISO 8601 (표준 - 우선 시도)
+  let date = new Date(dateStr)
+  if (!isNaN(date.getTime())) return date
+
+  // 네이버 금융 형식: "2024.03.15 14:30" 또는 "2024.03.15 14:30:45" (초 포함)
+  const naverMatch = dateStr.match(/^(\d{4})\.(\d{2})\.(\d{2})\s+(\d{2}):(\d{2})(?::\d{2})?$/)
+  if (naverMatch) {
+    const [, y, m, d, h, min] = naverMatch
+    date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d), parseInt(h), parseInt(min))
+    if (!isNaN(date.getTime())) return date
+  }
+
+  // DART 형식: "20240315"
+  const dartMatch = dateStr.match(/^(\d{4})(\d{2})(\d{2})$/)
+  if (dartMatch) {
+    const [, y, m, d] = dartMatch
+    date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d))
+    if (!isNaN(date.getTime())) return date
+  }
+
+  return null
+}
+
 /** 상대 시간 포맷 */
 function formatRelativeTime(dateStr: string): string {
+  const date = parseDate(dateStr)
+  if (!date) return dateStr || '날짜 없음'
+
   const now = new Date()
-  const date = new Date(dateStr)
   const diffMs = now.getTime() - date.getTime()
+  if (diffMs < 0) return '방금 전'
   const diffMins = Math.floor(diffMs / 60000)
   const diffHours = Math.floor(diffMins / 60)
   const diffDays = Math.floor(diffHours / 24)

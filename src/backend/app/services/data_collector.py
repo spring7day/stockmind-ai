@@ -47,7 +47,6 @@ async def load_stock_list() -> Dict[str, Dict]:
     if _stock_list_cache is not None:
         return _stock_list_cache
 
-    loop = asyncio.get_event_loop()
     result = {}
 
     def _fetch_list():
@@ -73,6 +72,7 @@ async def load_stock_list() -> Dict[str, Dict]:
 
         return stocks
 
+    loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, _fetch_list)
     _stock_list_cache = result
     logger.info(f"종목 목록 로드 완료: {len(result)}개")
@@ -112,8 +112,6 @@ async def get_stock_price(ticker: str) -> Optional[StockPrice]:
     pykrx로 현재 주가 데이터를 수집합니다.
     장 마감 후에는 당일 종가 기준으로 반환합니다.
     """
-    loop = asyncio.get_event_loop()
-
     def _fetch():
         today = _get_today()
         start = _get_date_n_days_ago(5)  # 주말/공휴일 고려 5일 전부터 조회
@@ -152,6 +150,7 @@ async def get_stock_price(ticker: str) -> Optional[StockPrice]:
             logger.error(f"[{ticker}] 주가 수집 실패: {e}")
             return None
 
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _fetch)
 
 
@@ -159,8 +158,6 @@ async def get_stock_fundamentals(ticker: str) -> Optional[StockFundamentals]:
     """
     pykrx로 펀더멘털 데이터(PER, PBR, EPS 등)를 수집합니다.
     """
-    loop = asyncio.get_event_loop()
-
     def _fetch():
         today = _get_today()
         start = _get_date_n_days_ago(5)
@@ -190,6 +187,7 @@ async def get_stock_fundamentals(ticker: str) -> Optional[StockFundamentals]:
             logger.error(f"[{ticker}] 펀더멘털 수집 실패: {e}")
             return None
 
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _fetch)
 
 
@@ -197,8 +195,6 @@ async def get_investor_trading(ticker: str) -> Optional[InvestorTrading]:
     """
     pykrx로 기관/외국인/개인 순매수 데이터를 수집합니다.
     """
-    loop = asyncio.get_event_loop()
-
     def _fetch():
         today = _get_today()
         start = _get_date_n_days_ago(3)
@@ -222,6 +218,7 @@ async def get_investor_trading(ticker: str) -> Optional[InvestorTrading]:
             logger.error(f"[{ticker}] 투자자 거래 수집 실패: {e}")
             return None
 
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _fetch)
 
 
@@ -229,8 +226,6 @@ async def get_short_selling(ticker: str) -> Optional[ShortSelling]:
     """
     pykrx로 공매도 비율 데이터를 수집합니다.
     """
-    loop = asyncio.get_event_loop()
-
     def _fetch():
         today = _get_today()
         start = _get_date_n_days_ago(5)
@@ -257,6 +252,7 @@ async def get_short_selling(ticker: str) -> Optional[ShortSelling]:
             logger.error(f"[{ticker}] 공매도 수집 실패: {e}")
             return None
 
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _fetch)
 
 

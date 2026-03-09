@@ -2,6 +2,7 @@
 StockMind AI — 주식 관련 Pydantic 모델 정의
 API 요청/응답 및 내부 데이터 구조 정의
 """
+import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -49,6 +50,69 @@ class ShortSelling(BaseModel):
     short_ratio: Optional[float] = Field(None, description="공매도 비율 (%)")
     short_balance: Optional[float] = Field(None, description="공매도 잔고 (주)")
     date: Optional[str] = Field(None, description="기준일 (YYYYMMDD)")
+
+
+class StockPriceResponse(BaseModel):
+    """프론트엔드 StockPrice 인터페이스와 1:1 매핑되는 응답 모델 (BUG-002).
+
+    프론트엔드가 기대하는 camelCase 필드명을 사용합니다:
+    currentPrice, openPrice, highPrice, lowPrice, closePrice, changePercent
+    """
+    ticker: str = Field(..., description="종목 코드")
+    currentPrice: float = Field(..., description="현재가 (원)")
+    openPrice: float = Field(..., description="시가")
+    highPrice: float = Field(..., description="고가")
+    lowPrice: float = Field(..., description="저가")
+    closePrice: float = Field(..., description="전일 종가")
+    change: float = Field(..., description="전일 대비 변화량")
+    changePercent: float = Field(..., description="전일 대비 변화율 (%)")
+    volume: int = Field(..., description="거래량")
+    marketCap: Optional[float] = Field(None, description="시가총액 (원)")
+    updatedAt: str = Field(..., description="마지막 업데이트 시각 (ISO 8601)")
+
+    @classmethod
+    def from_stock_price(
+        cls,
+        ticker: str,
+        price: "StockPrice",
+        market_cap: Optional[float] = None,
+    ) -> "StockPriceResponse":
+        """내부 StockPrice 모델을 프론트엔드 호환 응답으로 변환합니다."""
+        return cls(
+            ticker=ticker,
+            currentPrice=price.current,
+            openPrice=price.open,
+            highPrice=price.high,
+            lowPrice=price.low,
+            closePrice=price.prev_close,
+            change=price.change,
+            changePercent=price.change_pct,
+            volume=price.volume,
+            marketCap=market_cap,
+            updatedAt=datetime.utcnow().isoformat() + "Z",
+        )
+
+
+class StockSummaryResponse(BaseModel):
+    """인기 종목 카드에 사용되는 요약 응답 모델 (BUG-001).
+
+    프론트엔드 StockSummary (= Stock + StockPrice) 인터페이스에 맞춥니다.
+    """
+    ticker: str
+    name: str
+    market: str
+    sector: Optional[str] = None
+    currency: str = "KRW"
+    currentPrice: float = 0
+    openPrice: float = 0
+    highPrice: float = 0
+    lowPrice: float = 0
+    closePrice: float = 0
+    change: float = 0
+    changePercent: float = 0
+    volume: int = 0
+    marketCap: Optional[float] = None
+    updatedAt: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
 
 
 class StockInfo(BaseModel):
@@ -129,19 +193,49 @@ class AnalysisResult(BaseModel):
     cached: bool = Field(default=False, description="캐시에서 반환된 결과 여부")
 
 
+class TabAnalysisResult(BaseModel):
+    """탭별 AI 분석 결과 — 프론트엔드 AnalysisResult 인터페이스에 매핑 (BUG-003).
+
+    프론트엔드가 기대하는 구조:
+    { tab, ticker, summary, score?, signals?, details, generatedAt, disclaimer }
+    """
+    tab: str = Field(..., description="분석 탭 종류 (technical|fundamental|insights|sentiment)")
+    ticker: str
+    summary: str = Field(..., description="AI 분석 요약")
+    score: Optional[int] = Field(None, ge=0, le=100, description="점수 (0-100)")
+    details: str = Field(..., description="상세 분석 내용 (마크다운)")
+    generatedAt: str = Field(..., description="분석 생성 시각 (ISO 8601)")
+    disclaimer: str = Field(..., description="법적 면책 문구")
+
+
 # ────────────────────────────────────────────────
 # 뉴스 / 공시
 # ────────────────────────────────────────────────
 
 class NewsItem(BaseModel):
     """뉴스/공시 항목"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="고유 ID (UUID4)")
     title: str
     source: str = Field(..., description="출처 (언론사명 또는 DART)")
     url: Optional[str] = None
-    published_at: Optional[str] = None
+    published_at: Optional[str] = Field(None, description="발행 시각 (snake_case, 내부용)")
+    publishedAt: Optional[str] = Field(None, description="발행 시각 (camelCase, 프론트엔드용)")
     summary: Optional[str] = None
-    sentiment: Optional[str] = Field(None, description="해당 뉴스 센티먼트")
+    sentiment: Optional[str] = Field(None, description="해당 뉴스 센티먼트 (긍정/중립/부정)")
+    sentimentScore: Optional[float] = Field(None, ge=-1.0, le=1.0, description="센티먼트 점수 (-1.0 ~ 1.0)")
     is_disclosure: bool = Field(default=False, description="공시 여부")
+    isDisclosure: bool = Field(default=False, description="공시 여부 (camelCase, 프론트엔드용)")
+
+    def model_post_init(self, __context) -> None:
+        """published_at과 publishedAt, is_disclosure와 isDisclosure를 동기화합니다."""
+        # published_at ↔ publishedAt 양방향 동기화
+        if self.published_at and not self.publishedAt:
+            object.__setattr__(self, 'publishedAt', self.published_at)
+        elif self.publishedAt and not self.published_at:
+            object.__setattr__(self, 'published_at', self.publishedAt)
+
+        # is_disclosure를 기준으로 isDisclosure 단방향 동기화
+        object.__setattr__(self, 'isDisclosure', self.is_disclosure)
 
 
 class NewsResponse(BaseModel):

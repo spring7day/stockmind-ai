@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   },
   description:
     'AI가 분석하는 한국 주식 심층 리포트. 기술적 분석, 펀더멘털, 숨겨진 인사이트, 뉴스 센티먼트를 한 곳에서.',
-  keywords: ['주식', 'AI 분석', '주식 분석', '코스피', '코스닥', '주식 추천', '기술적 분석'],
+  keywords: ['주식', 'AI 분석', '주식 분석', '코스피', '코스닥', '주식 심층분석', '기술적 분석'],
   openGraph: {
     type: 'website',
     locale: 'ko_KR',

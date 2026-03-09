@@ -3,7 +3,7 @@
 import type { Metadata } from 'next'
 import dynamic from 'next/dynamic'
 import { notFound } from 'next/navigation'
-import { getStockPrice } from '@/lib/api'
+import { getStockPrice, getStockInfo } from '@/lib/api'
 import AnalysisSection from '@/components/stock/AnalysisSection'
 import NewsPanel from '@/components/stock/NewsPanel'
 import AdGate from '@/components/ui/AdGate'
@@ -27,11 +27,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { ticker } = await params
 
   try {
-    const price = await getStockPrice(ticker)
+    const [price, stockInfo] = await Promise.all([getStockPrice(ticker), getStockInfo(ticker)])
     const changeSign = price.changePercent >= 0 ? '+' : ''
     return {
-      title: `${ticker} 주가 분석 — AI 인사이트`,
-      description: `${ticker} 현재가 ${price.currentPrice.toLocaleString('ko-KR')}원 (${changeSign}${price.changePercent.toFixed(2)}%). AI 기반 기술적 분석, 펀더멘털, 숨겨진 인사이트 제공.`,
+      title: `${stockInfo.name} (${ticker}) 주가 분석 — AI 인사이트`,
+      description: `${stockInfo.name} 현재가 ${price.currentPrice.toLocaleString('ko-KR')}원 (${changeSign}${price.changePercent.toFixed(2)}%). AI 기반 기술적 분석, 펀더멘털, 숨겨진 인사이트 제공.`,
     }
   } catch {
     return {
@@ -55,10 +55,11 @@ export default async function StockDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  // 가격 데이터 로드 (서버 사이드)
+  // 가격 데이터 + 종목 기본 정보 로드 (서버 사이드, 병렬)
   let priceData
+  let stockInfo: { name: string; market: string; ticker: string }
   try {
-    priceData = await getStockPrice(ticker)
+    ;[priceData, stockInfo] = await Promise.all([getStockPrice(ticker), getStockInfo(ticker)])
   } catch {
     notFound()
   }
@@ -75,12 +76,12 @@ export default async function StockDetailPage({ params }: PageProps) {
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm text-text-muted">{ticker}</span>
             <span className="text-xs px-2 py-0.5 rounded-full bg-card border border-border text-text-muted">
-              KOSPI
+              {stockInfo.market}
             </span>
           </div>
 
-          {/* 종목명 (ticker로 임시 표시 — 실제는 API에서 name 받아야 함) */}
-          <h1 className="text-2xl font-bold text-text-primary">{ticker}</h1>
+          {/* 종목명 */}
+          <h1 className="text-2xl font-bold text-text-primary">{stockInfo.name}</h1>
         </div>
 
         {/* 현재가 + 등락률 */}

@@ -33,11 +33,11 @@ CLAUDE_MODEL = "claude-opus-4-6"
 MAX_TOKENS = 2048
 
 
-def _get_client() -> anthropic.Anthropic:
-    """Anthropic 클라이언트를 반환합니다."""
+def _get_client() -> anthropic.AsyncAnthropic:
+    """Anthropic 비동기 클라이언트를 반환합니다."""
     if not settings.ANTHROPIC_API_KEY:
         raise ValueError("ANTHROPIC_API_KEY가 설정되지 않았습니다.")
-    return anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    return anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
 
 def _format_stock_context(stock_info: StockInfo) -> str:
@@ -119,7 +119,7 @@ async def analyze_technical(stock_info: StockInfo) -> TechnicalAnalysis:
 
     try:
         client = _get_client()
-        message = client.messages.create(
+        message = await client.messages.create(
             model=CLAUDE_MODEL,
             max_tokens=MAX_TOKENS,
             messages=[{"role": "user", "content": prompt}],
@@ -172,7 +172,7 @@ async def analyze_fundamental(stock_info: StockInfo) -> FundamentalAnalysis:
 
     try:
         client = _get_client()
-        message = client.messages.create(
+        message = await client.messages.create(
             model=CLAUDE_MODEL,
             max_tokens=MAX_TOKENS,
             messages=[{"role": "user", "content": prompt}],
@@ -230,7 +230,7 @@ async def analyze_hidden_insights(
 
     try:
         client = _get_client()
-        message = client.messages.create(
+        message = await client.messages.create(
             model=CLAUDE_MODEL,
             max_tokens=MAX_TOKENS,
             messages=[{"role": "user", "content": prompt}],
@@ -286,7 +286,7 @@ async def analyze_sentiment(
 
     try:
         client = _get_client()
-        message = client.messages.create(
+        message = await client.messages.create(
             model=CLAUDE_MODEL,
             max_tokens=MAX_TOKENS,
             messages=[{"role": "user", "content": prompt}],

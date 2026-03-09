@@ -89,7 +89,7 @@ class StockAnalyzer:
     def _call_claude(self, prompt: str) -> str:
         """
         동기 방식으로 Claude API를 호출하고 응답 텍스트를 반환합니다.
-        asyncio.get_event_loop().run_in_executor 를 통해 비동기에서 호출됩니다.
+        asyncio.get_running_loop().run_in_executor 를 통해 비동기에서 호출됩니다.
         """
         message = self.client.messages.create(
             model=self.model,
@@ -102,7 +102,7 @@ class StockAnalyzer:
         """
         블로킹 API 호출을 스레드 풀에서 실행해 이벤트 루프를 차단하지 않습니다.
         """
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self._call_claude, prompt)
 
     # ------------------------------------------------------------------
