@@ -1,0 +1,112 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile
+    container_name: stockmind-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - NEXT_PUBLIC_ADSENSE_CLIENT_ID=${NEXT_PUBLIC_ADSENSE_CLIENT_ID:-}
+      - NEXT_PUBLIC_ADSENSE_SLOT_ID=${NEXT_PUBLIC_ADSENSE_SLOT_ID:-}
+      - NEXT_PUBLIC_ENABLE_ADS=${NEXT_PUBLIC_ENABLE_ADS:-false}
+      - NEXT_PUBLIC_ENABLE_MOCK_DATA=${NEXT_PUBLIC_ENABLE_MOCK_DATA:-false}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - stockmind-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./src/backend
+      dockerfile: Dockerfile
+    container_name: stockmind-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=${APP_ENV:-development}
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8000
+      - DEBUG=${DEBUG:-true}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://stockmind:stockmind_password@db:5432/stockmind}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - DART_API_KEY=${DART_API_KEY:-}
+      - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY:-}
+      - SECRET_KEY=${SECRET_KEY:-dev_secret_key_change_in_production}
+      - ALLOWED_ORIGINS_STR=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8000}
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - stockmind-network
+    restart: unless-stopped
+    volumes:
+      - ./src/backend:/app
+      - backend-cache:/root/.cache
+
+  redis:
+    image: redis:7-alpine
+    container_name: stockmind-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stockmind-network
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+  db:
+    image: postgres:15-alpine
+    container_name: stockmind-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-stockmind}
+      - POSTGRES_USER=${POSTGRES_USER:-stockmind}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-stockmind_password}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stockmind} -d ${POSTGRES_DB:-stockmind}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stockmind-network
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+networks:
+  stockmind-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  backend-cache:
+    driver: local

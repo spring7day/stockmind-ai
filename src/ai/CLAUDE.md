@@ -1,43 +1,63 @@
-# AI/ML Agent — AI 엔지니어
+# AI/ML Agent — AI 분석 엔진 구현자
 
 ## 역할
-StockMind AI의 핵심 두뇌. Claude API 기반 심층 분석 엔진 구축.
+너는 StockMind AI의 AI 분석 엔진을 구현하는 전문 에이전트다.
+메인 오케스트레이터가 Task로 spawn한다.
 
-## 책임
-- Claude API 프롬프트 엔지니어링 (분석 품질의 핵심)
-- 수집된 데이터 → 전문 분석 텍스트 변환 파이프라인
-- 분석 결과 구조화 (JSON 스키마 정의)
-- 할루시네이션 방지 메커니즘
-- 프롬프트 버전 관리
+## 구현 대상 파일
 
-## 분석 모듈별 프롬프트 전략
+### `src/ai/__init__.py`
+```python
+from .analyzer import StockAnalyzer
+__all__ = ["StockAnalyzer"]
+```
 
-### 기술적 분석 프롬프트
-- 입력: RSI, MACD, 볼린저밴드, 거래량 수치 데이터
-- 출력: "지금 이 수치들이 의미하는 것은..." 형식의 전문 해석
-- 핵심: 수치 나열이 아닌 **의미 해석**에 집중
+### `src/ai/models.py`
+Pydantic v2 모델:
+- `TechnicalAnalysis` — RSI, MACD 해석, 추세 방향, 지지/저항선
+- `FundamentalAnalysis` — 밸류에이션, PER/PBR 해석, 성장성
+- `SentimentAnalysis` — 뉴스 센티멘트, 긍정/부정 비율, 주요 이슈
+- `AIInsight` — 종합 AI 인사이트, 핵심 포인트 3가지, 리스크 경고
+- `StockAnalysisResult` — 위 4개 + ticker + timestamp + 면책 문구
 
-### 펀더멘털 분석 프롬프트
-- 입력: PER, PBR, EPS, 재무제표 데이터, 동종업계 평균
-- 출력: 적정 가치 대비 현재 가격 포지셔닝 + 근거
-- 핵심: DCF 계산은 백엔드에서, AI는 해석 담당
+### `src/ai/prompts.py`
+Claude API용 프롬프트 템플릿 함수:
+- `get_technical_prompt(ticker, data)` → str
+- `get_fundamental_prompt(ticker, data)` → str
+- `get_sentiment_prompt(ticker, news_items)` → str
+- `get_insight_prompt(ticker, all_data)` → str
 
-### 숨겨진 인사이트 프롬프트
-- 입력: 기관/외국인 매매 동향, 공매도 비율, 내부자 거래
-- 출력: "일반 투자자가 놓치는 시그널" 형식
-- 핵심: 데이터 간 **패턴과 연결** 발견
+각 프롬프트 마지막에 면책 문구: "이 분석은 투자 참고용이며 투자 권유가 아닙니다."
+매수/매도 표현 금지 → "상승 모멘텀", "하락 압력" 등으로 표현
 
-### 뉴스 센티먼트 프롬프트
-- 입력: 최근 뉴스 헤드라인 + 공시 내용
-- 출력: 호재/악재 분류 + 중요도 + 주가 영향 예측
-- 핵심: 단순 요약이 아닌 **투자 관점의 해석**
+### `src/ai/analyzer.py`
+`StockAnalyzer` 클래스:
+```python
+class StockAnalyzer:
+    def __init__(self, api_key: str):
+        self.client = anthropic.Anthropic(api_key=api_key)
+        self.model = "claude-3-5-haiku-20241022"  # 빠르고 저렴
+    
+    async def analyze_technical(self, ticker: str, price_data: dict) -> TechnicalAnalysis
+    async def analyze_fundamental(self, ticker: str, financial_data: dict) -> FundamentalAnalysis
+    async def analyze_sentiment(self, ticker: str, news: list) -> SentimentAnalysis
+    async def generate_insight(self, ticker: str, all_data: dict) -> AIInsight
+    async def analyze_full(self, ticker: str, market_data: dict) -> StockAnalysisResult
+```
 
-## 안전장치 (법적 리스크 관리)
-- 모든 분석 결과 앞에 면책 문구 자동 삽입
-- "매수/매도 권고" 표현 금지 → "참고 지표" 표현 사용
-- 확실하지 않은 예측에는 불확실성 명시
+## 기존 코드 참고
+- `src/backend/app/services/ai_analyzer.py` — 현재 스텁 코드, 이것을 완성
+- `src/backend/app/services/data_collector.py` — 데이터 구조 확인
+- `src/backend/app/models/stock.py` — 백엔드 모델과 호환
 
-## 산출물
-- `src/ai/prompts/` — 버전 관리된 프롬프트 파일
-- `src/ai/schemas/` — 분석 결과 JSON 스키마
-- `src/ai/pipeline.py` — 분석 파이프라인 메인 코드
+## 기술 요건
+- `anthropic` 패키지 사용 (pip install anthropic)
+- asyncio 기반 비동기
+- 모든 Claude API 호출에 try/except
+- JSON mode 활용 (structured output)
+- 응답 파싱 실패 시 기본값 반환 (서비스 중단 금지)
+
+## 완료 기준
+1. 모든 파일 생성 완료
+2. `from src.ai import StockAnalyzer` import 가능
+3. `src/backend/requirements.txt`에 anthropic 추가

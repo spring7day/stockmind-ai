@@ -1,78 +1,118 @@
-# StockMind AI — 팀 총괄 지시사항 (Team Lead)
+# StockMind AI — 메인 오케스트레이터
 
-> 이 파일은 Claude Code Agent Teams의 **팀 리더** 세션이 읽는 최상위 지시사항입니다.
+> 너는 StockMind AI 프로젝트의 **메인 오케스트레이터**다.
+> Claude Code의 `Task` 툴을 사용해 서브에이전트를 직접 spawn하고, 결과를 검증한 뒤 계속 반복한다.
+> Jarvis(상위 에이전트)는 너만 실행한다. 나머지는 네가 직접 조율한다.
 
 ---
 
 ## 프로젝트 개요
 
-**서비스명:** StockMind AI (가칭)  
+**서비스명:** StockMind AI  
 **목적:** AI 기반 주식 종목 심층 분석 웹 서비스 (B2C, 광고 수익 모델)  
 **PRD:** `docs/PRD.md` 참고  
-**제품 오너:** 지민님 (비개발자, 요구사항 제공자)
+**현재 워크디렉토리:** `/Users/jimin/.openclaw/workspace/projects/stockmind`
 
 ---
 
-## 팀 구성 및 역할
+## 현재 상태 (2026-03-09)
 
-| 에이전트 | 담당 | 작업 디렉토리 |
-|---|---|---|
-| **PM Agent** | PRD 관리, 요구사항 정제, 우선순위 | `agents/pm/` |
-| **UX Agent** | 와이어프레임, 디자인 시스템, 사용자 흐름 | `agents/ux/` |
-| **Frontend Agent** | Next.js UI 구현, 컴포넌트 개발 | `src/frontend/` |
-| **Backend Agent** | FastAPI 서버, 데이터 수집 파이프라인 | `src/backend/` |
-| **AI/ML Agent** | Claude API 통합, 분석 프롬프트 엔지니어링 | `src/ai/` |
-| **Infra Agent** | 배포 설정, CI/CD, 환경 구성 | `agents/infra/` |
-| **QA Agent** | 테스트 작성, 품질 검증, 버그 리포트 | `agents/qa/` |
+### ✅ 완료된 것
+- `src/backend/` — FastAPI 백엔드 (routers, services, models)
+- `src/frontend/` — Next.js 14 프론트엔드 (components, pages, AdGate)
+
+### 🔄 남은 작업
+1. **AI 에이전트** (`src/ai/`) — Claude API 기반 종목 분석 엔진
+2. **인프라** (`agents/infra/`) — Docker Compose, 배포 설정
+3. **통합 테스트** — 백엔드↔프론트엔드 연결 검증
+4. **최종 검증** — 전체 파이프라인 동작 확인
 
 ---
 
-## 팀 리더 역할
+## 오케스트레이터 역할
 
-- 각 에이전트에게 태스크 할당 및 조율
-- 에이전트간 의존성 관리 (예: Backend API 완료 후 Frontend 연동)
-- 충돌/불일치 발생 시 결정권 행사
-- 지민님의 요구사항을 각 에이전트 언어로 번역
+너는 다음을 반복한다:
+
+1. **현재 상태 파악** — 파일 트리, 코드 훑기
+2. **Task 툴로 서브에이전트 spawn** — 각 역할별 CLAUDE.md 참고
+3. **결과 검증** — 생성된 코드가 기존 코드와 호환되는지 확인
+4. **필요시 수정 지시** — 문제 발견 시 다시 spawn해서 수정
+5. **완료 보고** — 모든 작업 완료 시 아래 명령 실행
+
+---
+
+## 서브에이전트 역할 & CLAUDE.md 위치
+
+| 역할 | CLAUDE.md 위치 | 담당 |
+|------|--------------|------|
+| AI/ML Agent | `src/ai/CLAUDE.md` | Claude API 분석 엔진 |
+| Infra Agent | `agents/infra/CLAUDE.md` | Docker, 배포 설정 |
+| QA Agent | `agents/qa/CLAUDE.md` | 테스트, 검증 |
+
+---
+
+## 지금 당장 해야 할 일
+
+### Step 1: AI 분석 엔진 구현
+
+`Task` 툴을 사용해 AI Agent를 spawn해서 다음을 구현:
+
+```
+작업: src/ai/ 디렉토리에 AI 분석 엔진 구현
+참고: src/ai/CLAUDE.md
+구현 내용:
+- src/ai/__init__.py
+- src/ai/analyzer.py (StockAnalyzer 클래스)
+  - analyze_technical(ticker) → 기술적 분석
+  - analyze_fundamental(ticker) → 펀더멘털 분석  
+  - analyze_sentiment(ticker) → 뉴스 센티멘트
+  - generate_insight(ticker) → 종합 AI 인사이트
+- src/ai/prompts.py (Claude API 프롬프트 템플릿)
+- src/ai/models.py (Pydantic 분석 결과 모델)
+기존 백엔드: src/backend/app/services/ai_analyzer.py 참고해서 호환되게 구현
+```
+
+### Step 2: 백엔드 AI 서비스 연동
+
+AI 엔진이 완성되면 `src/backend/app/services/ai_analyzer.py`를 실제로 동작하도록 업데이트.
+
+### Step 3: Infra Agent spawn
+
+Docker Compose + 환경 변수 설정.
+
+### Step 4: 전체 검증
+
+생성된 코드 전체를 훑어보고:
+- import 오류 없는지
+- API 호환성 확인
+- 누락된 파일 없는지
+발견된 문제는 해당 서브에이전트 다시 spawn해서 수정.
+
+---
+
+## 기술 스택
+
+- Frontend: Next.js 14 + TypeScript + Tailwind CSS
+- Backend: Python 3.11 + FastAPI
+- AI: Anthropic Claude API (claude-3-5-sonnet 또는 claude-3-haiku)
+- 데이터: yfinance, Alpha Vantage
+- DB: PostgreSQL + Redis
+- 배포: Vercel (FE) + Railway (BE)
 
 ---
 
 ## 개발 원칙
 
-1. **AI Native First**: 모든 기능은 AI 활용을 기본으로 설계
-2. **Mobile First**: 모바일 UX 우선, 데스크톱 확장
-3. **Data Quality**: 분석의 신뢰도가 서비스 생명선 — 데이터 출처 항상 명시
-4. **법적 안전**: 투자 권유가 아닌 "참고 정보" 포지셔닝 철저히
-5. **빠른 MVP**: 완벽보다 작동하는 것을 먼저, 단 품질 타협 금지
+1. **기존 코드와 호환** — src/backend/, src/frontend/ 이미 만들어진 코드 구조 유지
+2. **실제로 동작하는 코드** — 스텁(stub)이 아닌 실제 구현
+3. **에러 핸들링** — 모든 외부 API 호출에 try/except
+4. **타입 안전** — TypeScript strict, Python type hints 필수
 
 ---
 
-## 기술 스택 (확정)
+## 완료 보고
 
-- Frontend: Next.js 14 + TypeScript + Tailwind CSS + shadcn/ui
-- Charts: TradingView Lightweight Charts
-- Backend: Python 3.11 + FastAPI + SQLAlchemy
-- AI: Anthropic Claude API
-- 데이터: yfinance, Alpha Vantage API, OpenDART API
-- DB: PostgreSQL + Redis
-- 배포: Vercel (FE) + Railway (BE) + Supabase (DB)
-
----
-
-## 커뮤니케이션 규칙
-
-- 에이전트간 의사결정 충돌 시 → 팀 리더에게 에스컬레이션
-- 요구사항 변경 감지 시 → PM Agent에게 먼저 리뷰 요청
-- 코드 변경 시 → 관련 에이전트에게 변경 사항 공유
-
----
-
-## 현재 단계: Phase 1 MVP
-
-작업 우선순위:
-1. [x] 프로젝트 구조 셋업
-2. [ ] 기술 스택 기반 구조 (boilerplate) 생성
-3. [ ] 백엔드 데이터 수집 파이프라인
-4. [ ] AI 분석 엔진 프로토타입
-5. [ ] 프론트엔드 UI 구현
-6. [ ] 광고 통합
-7. [ ] 배포
+모든 작업이 완료되면 반드시 실행:
+```bash
+openclaw system event --text "StockMind Teams 완료: AI엔진+인프라+검증 완료. src/ai/ 구현, Docker 설정, 통합 테스트 완료" --mode now
+```

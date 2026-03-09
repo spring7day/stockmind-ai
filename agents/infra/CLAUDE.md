@@ -1,32 +1,62 @@
-# Infra Agent — 인프라/아키텍처
+# Infra Agent — 인프라 & 배포 설정
 
 ## 역할
-StockMind AI의 인프라 설계 및 배포 파이프라인 구축.
+너는 StockMind AI의 인프라와 배포 환경을 구성하는 에이전트다.
+메인 오케스트레이터가 Task로 spawn한다.
 
-## 책임
-- 개발/스테이징/프로덕션 환경 구성
-- CI/CD 파이프라인 (GitHub Actions)
-- Vercel (FE) + Railway (BE) + Supabase (DB) 셋업
-- 환경변수 및 시크릿 관리
-- 모니터링 설정 (Sentry, PostHog)
+## 구현 대상 파일
 
-## 아키텍처 개요
+### `docker-compose.yml` (프로젝트 루트)
+서비스:
+- `frontend`: Next.js (포트 3000)
+- `backend`: FastAPI (포트 8000)
+- `redis`: Redis 7 (포트 6379)
+- `db`: PostgreSQL 15 (포트 5432)
+
+### `src/backend/Dockerfile`
+Python 3.11-slim 기반, uvicorn으로 FastAPI 실행
+
+### `src/frontend/Dockerfile`
+node:20-alpine 기반, Next.js standalone output
+
+### `.env.example` (프로젝트 루트)
 ```
-[사용자] → [Vercel - Next.js FE]
-                ↓ API 호출
-          [Railway - FastAPI BE]
-                ↓
-    [Supabase PostgreSQL] + [Redis Cache]
-                ↓
-    [External APIs: yfinance, Alpha Vantage, OpenDART, Claude API]
+# API Keys
+ANTHROPIC_API_KEY=your_anthropic_api_key
+ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key
+
+# Database
+DATABASE_URL=postgresql://stockmind:password@db:5432/stockmind
+REDIS_URL=redis://redis:6379/0
+
+# App
+NEXT_PUBLIC_API_URL=http://localhost:8000
+SECRET_KEY=your_secret_key_here
 ```
 
-## 비용 목표 (MVP)
-- 월 $50 이하로 운영 가능하게 설계
-- Vercel Free → Railway Starter ($5/월) → Supabase Free
+### `Makefile` (프로젝트 루트)
+```makefile
+dev:        # docker-compose up
+build:      # docker-compose build
+stop:       # docker-compose down
+logs:       # docker-compose logs -f
+migrate:    # DB 마이그레이션
+test:       # 테스트 실행
+```
 
-## 산출물
-- `docker-compose.yml` (로컬 개발 환경)
-- `.github/workflows/` (CI/CD)
-- `agents/infra/architecture.md` (아키텍처 문서)
-- 환경변수 템플릿 (`.env.example`)
+### `README.md` (업데이트)
+- 프로젝트 설명
+- 빠른 시작 가이드 (5단계 이내)
+- 환경 변수 설명
+- API 엔드포인트 목록
+
+## 기존 참고
+- `src/backend/.env.example` — 백엔드 환경변수
+- `src/frontend/.env.local.example` — 프론트엔드 환경변수
+
+## 완료 기준
+1. `docker-compose.yml` 생성
+2. 두 Dockerfile 생성
+3. `.env.example` 통합 생성
+4. `Makefile` 생성
+5. `README.md` 업데이트
