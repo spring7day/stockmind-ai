@@ -62,7 +62,7 @@ export default function PriceChart({ ticker, currentPrice, changePercent }: Pric
     if (!chartContainerRef.current || candles.length === 0) return
 
     // 동적 임포트
-    import('lightweight-charts').then(({ createChart, ColorType, CandlestickSeries }) => {
+    import('lightweight-charts').then(({ createChart, ColorType }) => {
       const container = chartContainerRef.current!
 
       // 기존 차트 제거
@@ -97,8 +97,8 @@ export default function PriceChart({ ticker, currentPrice, changePercent }: Pric
         height: 280,
       })
 
-      // 캔들스틱 시리즈 추가
-      const candleSeries = chart.addSeries(CandlestickSeries, {
+      // 캔들스틱 시리즈 추가 (v4 API)
+      const candleSeries = chart.addCandlestickSeries({
         upColor: '#EF4444',        // 상승: 빨강 (한국 시장)
         downColor: '#3B82F6',      // 하락: 파랑 (한국 시장)
         borderUpColor: '#EF4444',
