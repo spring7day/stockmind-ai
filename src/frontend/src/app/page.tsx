@@ -17,7 +17,13 @@ export const metadata: Metadata = {
 
 // 인기 종목 섹션 (서버 컴포넌트)
 async function PopularStocks() {
-  const stocks = await getPopularStocks()
+  let stocks = []
+  try {
+    stocks = await getPopularStocks()
+  } catch {
+    // 백엔드 없을 때 빈 화면 방지 — 빌드/렌더 오류 무시
+    stocks = []
+  }
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">

@@ -15,7 +15,8 @@ import type {
 } from '@/types/stock'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-const MOCK_MODE = process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA === 'true'
+// 백엔드 URL이 명시적으로 설정되지 않으면 목 모드 사용 (Vercel 배포 시 기본값)
+const MOCK_MODE = process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA === 'true' || !process.env.NEXT_PUBLIC_API_URL
 
 /** API 에러 클래스 */
 export class ApiError extends Error {
