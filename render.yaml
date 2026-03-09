@@ -58,6 +58,15 @@ services:
         value: false
 
 # ============================================================
+# Redis
+# ============================================================
+  - type: redis
+    name: stockmind-redis
+    region: singapore
+    plan: free
+    ipAllowList: []
+
+# ============================================================
 # Database — PostgreSQL
 # ============================================================
 databases:
@@ -66,12 +75,3 @@ databases:
     plan: free
     databaseName: stockmind
     user: stockmind
-
-# ============================================================
-# Redis
-# ============================================================
-  - type: redis
-    name: stockmind-redis
-    region: singapore
-    plan: free
-    maxmemoryPolicy: allkeys-lru
