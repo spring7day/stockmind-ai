@@ -17,11 +17,10 @@ export const metadata: Metadata = {
 
 // 인기 종목 섹션 (서버 컴포넌트)
 async function PopularStocks() {
-  let stocks = []
+  let stocks: Awaited<ReturnType<typeof getPopularStocks>> = []
   try {
     stocks = await getPopularStocks()
   } catch {
-    // 백엔드 없을 때 빈 화면 방지 — 빌드/렌더 오류 무시
     stocks = []
   }
 
