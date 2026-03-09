@@ -4,7 +4,11 @@ import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import StockCard from '@/components/stock/StockCard'
 import { PopularStocksSkeleton } from '@/components/ui/LoadingSkeleton'
+import HomeSearchClient from '@/components/ui/HomeSearchClient'
 import { getPopularStocks } from '@/lib/api'
+
+// 백엔드 API를 사용하므로 정적 생성 비활성화
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'StockMind AI — AI 기반 주식 심층 분석',
@@ -54,7 +58,7 @@ export default function HomePage() {
           </p>
 
           {/* 검색창 (클라이언트 사이드 — Header와 별개로 홈에 큰 검색창) */}
-          <HomeSearch />
+          <HomeSearchClient />
 
           {/* 특징 배지 */}
           <div className="flex flex-wrap justify-center gap-3 mt-8">
@@ -121,48 +125,6 @@ export default function HomePage() {
           ))}
         </div>
       </section>
-    </div>
-  )
-}
-
-// 클라이언트 검색창 컴포넌트 (별도 파일로 분리 가능)
-// 홈 페이지용 큰 검색창
-function HomeSearch() {
-  // 실제 검색 기능은 Header의 검색창과 동일한 로직 — 클라이언트 컴포넌트로 분리
-  // 여기서는 Server Component이므로 별도 Client Component 파일 필요
-  // 현재는 링크로 대체 (향후 HomeSearchClient.tsx로 분리)
-  return (
-    <div className="relative max-w-lg mx-auto">
-      <a
-        href="#"
-        onClick={(e) => {
-          e.preventDefault()
-          // 헤더의 검색창에 포커스
-          const headerInput = document.querySelector('header input') as HTMLInputElement
-          headerInput?.focus()
-        }}
-        className="flex items-center gap-3 w-full bg-card border border-border hover:border-primary/50 rounded-xl px-4 py-4 transition-colors cursor-pointer group"
-      >
-        <svg
-          className="w-5 h-5 text-text-muted group-hover:text-primary transition-colors"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
-        <span className="text-text-muted group-hover:text-text-secondary transition-colors">
-          종목명 또는 종목코드로 검색 (예: 삼성전자, 005930)
-        </span>
-        <span className="ml-auto text-xs px-2 py-1 rounded-lg bg-surface border border-border text-text-muted hidden sm:block">
-          ⌘K
-        </span>
-      </a>
     </div>
   )
 }
