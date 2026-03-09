@@ -90,7 +90,6 @@ export default function PriceChart({ ticker, currentPrice, changePercent }: Pric
         },
         timeScale: {
           borderColor: '#1E293B',
-          textColor: '#94A3B8',
           timeVisible: true,
         },
         width: container.clientWidth,
