@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   // 백엔드 API 프록시 설정
   async rewrites() {
     return [

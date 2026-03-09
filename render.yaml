@@ -1,0 +1,77 @@
+services:
+  # ============================================================
+  # Backend — FastAPI
+  # ============================================================
+  - type: web
+    name: stockmind-backend
+    runtime: python
+    region: singapore
+    plan: free
+    rootDir: src/backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: false
+      - key: ANTHROPIC_API_KEY
+        sync: false        # Render 대시보드에서 직접 입력
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stockmind-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: stockmind-redis
+          type: redis
+          property: connectionString
+      - key: ALLOWED_ORIGINS_STR
+        value: https://stockmind-frontend.onrender.com
+      - key: DART_API_KEY
+        sync: false        # 선택사항 — 없어도 동작
+      - key: ALPHA_VANTAGE_API_KEY
+        sync: false        # 선택사항 — 없어도 동작
+
+  # ============================================================
+  # Frontend — Next.js
+  # ============================================================
+  - type: web
+    name: stockmind-frontend
+    runtime: node
+    region: singapore
+    plan: free
+    rootDir: src/frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://stockmind-backend.onrender.com
+      - key: NEXT_PUBLIC_ENABLE_MOCK_DATA
+        value: false
+      - key: NEXT_PUBLIC_ENABLE_ADS
+        value: false
+
+# ============================================================
+# Database — PostgreSQL
+# ============================================================
+databases:
+  - name: stockmind-db
+    region: singapore
+    plan: free
+    databaseName: stockmind
+    user: stockmind
+
+# ============================================================
+# Redis
+# ============================================================
+  - type: redis
+    name: stockmind-redis
+    region: singapore
+    plan: free
+    maxmemoryPolicy: allkeys-lru
