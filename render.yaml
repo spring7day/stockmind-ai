@@ -8,8 +8,9 @@ services:
     region: singapore
     plan: free
     rootDir: src/backend
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    pythonVersion: "3.11.0"
     healthCheckPath: /health
     envVars:
       - key: APP_ENV
@@ -46,7 +47,8 @@ services:
     plan: free
     rootDir: src/frontend
     buildCommand: npm ci && npm run build
-    startCommand: npm start
+    startCommand: node .next/standalone/server.js
+    nodeVersion: "20.0.0"
     envVars:
       - key: NODE_ENV
         value: production
