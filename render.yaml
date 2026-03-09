@@ -10,7 +10,6 @@ services:
     rootDir: src/backend
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
-    pythonVersion: "3.11.0"
     healthCheckPath: /health
     envVars:
       - key: APP_ENV
@@ -48,7 +47,6 @@ services:
     rootDir: src/frontend
     buildCommand: npm ci && npm run build
     startCommand: node .next/standalone/server.js
-    nodeVersion: "20.0.0"
     envVars:
       - key: NODE_ENV
         value: production
