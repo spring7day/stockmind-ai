@@ -47,7 +47,7 @@ services:
     region: singapore
     plan: free
     rootDir: src/frontend
-    buildCommand: npm ci && npm run build && cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static
+    buildCommand: npm ci --include=dev && npm run build && cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static
     startCommand: node .next/standalone/server.js
     envVars:
       - key: NODE_VERSION
