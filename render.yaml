@@ -31,6 +31,8 @@ services:
           property: connectionString
       - key: ALLOWED_ORIGINS_STR
         value: https://stockmind-frontend.onrender.com
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: DART_API_KEY
         sync: false        # 선택사항 — 없어도 동작
       - key: ALPHA_VANTAGE_API_KEY
