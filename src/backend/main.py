@@ -17,6 +17,9 @@ async def lifespan(app: FastAPI):
     # 시작 시: Redis 연결 등 초기화
     from app.services.cache import cache_service
     await cache_service.connect()
+    # 종목 목록 캐시 초기화
+    from app.services import data_collector
+    await data_collector.load_stock_list()
     print(f"[StockMind] 서버 시작 — 환경: {settings.APP_ENV}")
     yield
     # 종료 시: 연결 정리
