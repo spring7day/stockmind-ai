@@ -47,8 +47,8 @@ services:
     region: singapore
     plan: free
     rootDir: src/frontend
-    buildCommand: npm ci --include=dev && npm run build && cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static
-    startCommand: cd .next/standalone && node server.js
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
     envVars:
       - key: NODE_VERSION
         value: 20.18.0

@@ -5,7 +5,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+
   // webpack path alias 명시적 설정 (Render 환경 호환)
   webpack: (config) => {
     config.resolve.alias = {
