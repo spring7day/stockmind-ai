@@ -48,7 +48,7 @@ services:
     plan: free
     rootDir: src/frontend
     buildCommand: npm ci --include=dev && npm run build && cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static
-    startCommand: node .next/standalone/server.js
+    startCommand: cd .next/standalone && node server.js
     envVars:
       - key: NODE_VERSION
         value: 20.18.0
