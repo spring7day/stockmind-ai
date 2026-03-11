@@ -1,19 +1,17 @@
 """
 StockMind AI — 한국 주식 데이터 수집 서비스
-yfinance와 정적 종목 목록(stocks.json)을 활용하여 주식 데이터를 수집합니다.
+FinanceDataReader와 정적 종목 목록(stocks.json)을 활용하여 주식 데이터를 수집합니다.
 """
 import asyncio
 import json
 import logging
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import FinanceDataReader as fdr
 import httpx
 import pandas as pd
-import requests
-import yfinance as yf
 
 from app.config import settings
 from app.models.stock import (
@@ -34,21 +32,6 @@ _stock_list_cache: Optional[Dict[str, Dict]] = None
 # stocks.json 경로
 _STOCKS_JSON_PATH = Path(__file__).parent.parent / "data" / "stocks.json"
 
-# Yahoo Finance 요청용 브라우저 세션 (429 우회)
-def _make_yf_session() -> requests.Session:
-    """브라우저처럼 보이는 헤더가 설정된 requests Session을 반환합니다."""
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
-        ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-    })
-    return session
-
 
 def _get_today() -> str:
     """오늘 날짜를 YYYYMMDD 형식으로 반환"""
@@ -60,11 +43,9 @@ def _get_date_n_days_ago(n: int) -> str:
     return (datetime.now() - timedelta(days=n)).strftime("%Y%m%d")
 
 
-def _ticker_to_yf(ticker: str, market: str) -> str:
-    """종목코드를 yfinance 형식으로 변환 (KOSPI: .KS, KOSDAQ: .KQ)"""
-    if market == "KOSDAQ":
-        return f"{ticker}.KQ"
-    return f"{ticker}.KS"
+def _get_start_date_for_fetch() -> str:
+    """주가 조회 시작일 (10 영업일 여유분을 위해 14일 전)을 YYYY-MM-DD 형식으로 반환"""
+    return (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d")
 
 
 async def load_stock_list() -> Dict[str, Dict]:
@@ -125,9 +106,8 @@ def search_stocks(query: str, limit: int = 20) -> List[StockSearchResult]:
 
 async def get_stock_price(ticker: str) -> Optional[StockPrice]:
     """
-    yfinance로 현재 주가 데이터를 수집합니다.
-    Redis 캐시(TTL 300초) → Yahoo Finance 요청 순으로 시도합니다.
-    429 오류 시 3초 대기 후 1회 재시도합니다.
+    FinanceDataReader로 현재 주가 데이터를 수집합니다.
+    Redis 캐시(TTL 300초) → fdr.DataReader 요청 순으로 시도합니다.
     """
     from app.services.cache import cache_service
 
@@ -139,23 +119,15 @@ async def get_stock_price(ticker: str) -> Optional[StockPrice]:
         logger.debug(f"[{ticker}] 주가 캐시 히트")
         return StockPrice(**cached)
 
-    stock_list = _stock_list_cache or {}
-    market = stock_list.get(ticker, {}).get("market", "KOSPI")
-    yf_ticker = _ticker_to_yf(ticker, market)
-
-    def _fetch(retry: bool = False) -> Optional[StockPrice]:
+    def _fetch() -> Optional[StockPrice]:
         try:
-            session = _make_yf_session()
-            # yf.download()는 Ticker().history()보다 rate limit 부담이 적음
-            df = yf.download(
-                yf_ticker, period="5d", progress=False,
-                auto_adjust=True, session=session,
-            )
-            if df.empty:
-                # fallback: Ticker().history()
-                t = yf.Ticker(yf_ticker, session=session)
-                df = t.history(period="5d")
-            if df.empty:
+            start_date = _get_start_date_for_fetch()
+            df = fdr.DataReader(ticker, start_date)
+            if df is None or df.empty:
+                logger.warning(f"[{ticker}] fdr.DataReader 결과 없음")
+                return None
+
+            if len(df) < 1:
                 return None
 
             latest = df.iloc[-1]
@@ -178,11 +150,6 @@ async def get_stock_price(ticker: str) -> Optional[StockPrice]:
                 trading_value=None,
             )
         except Exception as e:
-            err_str = str(e)
-            if "429" in err_str and not retry:
-                logger.warning(f"[{ticker}] Yahoo Finance 429 — 3초 대기 후 재시도")
-                time.sleep(3)
-                return _fetch(retry=True)
             logger.error(f"[{ticker}] 주가 수집 실패: {e}")
             return None
 
@@ -191,83 +158,21 @@ async def get_stock_price(ticker: str) -> Optional[StockPrice]:
 
     if result is not None:
         await cache_service.set(cache_key, result.model_dump(), ttl=300)
-    else:
-        # 캐시에 stale 데이터가 있으면 반환 (TTL 만료 후 재확인)
-        stale = await cache_service.get(f"{cache_key}:stale")
-        if stale is not None:
-            logger.warning(f"[{ticker}] Yahoo 실패 — stale 캐시 반환")
-            return StockPrice(**stale)
 
     return result
 
 
 async def get_stock_fundamentals(ticker: str) -> Optional[StockFundamentals]:
     """
-    yfinance로 펀더멘털 데이터(PER, PBR, EPS 등)를 수집합니다.
-    Redis 캐시(TTL 300초) → Yahoo Finance 요청 순으로 시도합니다.
-    429 오류 시 3초 대기 후 1회 재시도합니다.
+    FinanceDataReader는 PER/PBR 등 펀더멘털 데이터를 제공하지 않으므로 None을 반환합니다.
+    향후 OpenDART 또는 다른 API로 교체 가능합니다.
     """
-    from app.services.cache import cache_service
-
-    cache_key = f"fundamentals:{ticker}"
-
-    # 캐시 확인
-    cached = await cache_service.get(cache_key)
-    if cached is not None:
-        logger.debug(f"[{ticker}] 펀더멘털 캐시 히트")
-        return StockFundamentals(**cached)
-
-    stock_list = _stock_list_cache or {}
-    market = stock_list.get(ticker, {}).get("market", "KOSPI")
-    yf_ticker = _ticker_to_yf(ticker, market)
-
-    def _fetch(retry: bool = False) -> Optional[StockFundamentals]:
-        try:
-            session = _make_yf_session()
-            t = yf.Ticker(yf_ticker, session=session)
-            info = t.info
-
-            market_cap = _safe_float(info.get("marketCap"))
-            per = _safe_float(info.get("trailingPE"))
-            pbr = _safe_float(info.get("priceToBook"))
-            eps = _safe_float(info.get("trailingEps"))
-            dividend_yield = _safe_float(info.get("dividendYield"))
-            if dividend_yield is not None:
-                dividend_yield = round(dividend_yield * 100, 2)
-
-            return StockFundamentals(
-                market_cap=market_cap,
-                per=per,
-                pbr=pbr,
-                eps=eps,
-                dividend_yield=dividend_yield,
-            )
-        except Exception as e:
-            err_str = str(e)
-            if "429" in err_str and not retry:
-                logger.warning(f"[{ticker}] Yahoo Finance 429 — 3초 대기 후 재시도")
-                time.sleep(3)
-                return _fetch(retry=True)
-            logger.error(f"[{ticker}] 펀더멘털 수집 실패: {e}")
-            return None
-
-    loop = asyncio.get_running_loop()
-    result = await loop.run_in_executor(None, _fetch)
-
-    if result is not None:
-        await cache_service.set(cache_key, result.model_dump(), ttl=300)
-    else:
-        stale = await cache_service.get(f"{cache_key}:stale")
-        if stale is not None:
-            logger.warning(f"[{ticker}] Yahoo 실패 — stale 캐시 반환")
-            return StockFundamentals(**stale)
-
-    return result
+    return None
 
 
 async def get_investor_trading(ticker: str) -> Optional[InvestorTrading]:
     """
-    yfinance는 기관/외국인/개인 순매수 데이터를 제공하지 않으므로 None을 반환합니다.
+    FinanceDataReader는 기관/외국인/개인 순매수 데이터를 제공하지 않으므로 None을 반환합니다.
     향후 OpenDART 또는 다른 API로 교체 가능합니다.
     """
     return None
@@ -275,7 +180,7 @@ async def get_investor_trading(ticker: str) -> Optional[InvestorTrading]:
 
 async def get_short_selling(ticker: str) -> Optional[ShortSelling]:
     """
-    yfinance는 한국 주식 공매도 비율 데이터를 제공하지 않으므로 None을 반환합니다.
+    FinanceDataReader는 한국 주식 공매도 비율 데이터를 제공하지 않으므로 None을 반환합니다.
     """
     return None
 
@@ -292,7 +197,7 @@ async def get_full_stock_info(ticker: str) -> Optional[StockInfo]:
 
     info = stock_list[ticker]
 
-    # 가격 + 펀더멘털 병렬 수집 (투자자거래/공매도는 yfinance 미지원)
+    # 가격 수집 (펀더멘털/투자자거래/공매도는 fdr 미지원)
     price, fundamentals = await asyncio.gather(
         get_stock_price(ticker),
         get_stock_fundamentals(ticker),
