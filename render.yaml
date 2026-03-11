@@ -55,7 +55,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: NEXT_PUBLIC_API_URL
-        value: https://stockmind-backend.onrender.com
+        value: https://stockmind-backend-x73c.onrender.com
       - key: NEXT_PUBLIC_ENABLE_MOCK_DATA
         value: false
       - key: NEXT_PUBLIC_ENABLE_ADS
